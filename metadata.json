@@ -1,0 +1,6 @@
+{
+  "name": "Schedule Maker",
+  "description": "An offline school schedule maker supporting drag-and-drop planning, reference screenshots, and high-quality PDF/Photo exports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
