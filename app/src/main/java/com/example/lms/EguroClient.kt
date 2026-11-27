@@ -125,6 +125,7 @@ object EguroClient {
      */
     internal fun discoverScheduleCandidateUrls(html: String, baseUrl: String): List<String> {
         val base = baseUrl.toHttpUrlOrNull() ?: return emptyList()
+        val myClass = LinkedHashSet<String>()
         val prioritized = LinkedHashSet<String>()
         val secondary = LinkedHashSet<String>()
 
@@ -145,7 +146,9 @@ object EguroClient {
             if (!resolved.startsWith(BASE_URL, ignoreCase = true) && base.host != resolved.toHttpUrlOrNull()?.host) return
 
             val combined = "$lowerUrl $lowerLabel"
-            if (highKeywords.any { combined.contains(it) }) {
+            if (lowerLabel == "my class" || lowerLabel == "my classes") {
+                myClass.add(resolved)
+            } else if (highKeywords.any { combined.contains(it) }) {
                 prioritized.add(resolved)
             } else if (lowKeywords.any { combined.contains(it) }) {
                 secondary.add(resolved)
@@ -176,7 +179,7 @@ object EguroClient {
             classifyAndAdd(m.groupValues[1])
         }
 
-        return (prioritized + secondary).toList()
+        return (myClass + prioritized + secondary).toList()
     }
 
     suspend fun loginAndFetchSchedule(
@@ -251,9 +254,13 @@ object EguroClient {
         // 3. Breadth-first discovery across custom path, "My Class" / schedule links, and sub-endpoints
         val queue = ArrayDeque<String>()
         val queuedSet = LinkedHashSet<String>()
+        val expectedHost = BASE_URL.toHttpUrlOrNull()?.host
         fun enqueue(url: String) {
-            if (url.isNotBlank() && queuedSet.size < 14 && queuedSet.add(url)) {
-                queue.addLast(url)
+            val parsed = url.toHttpUrlOrNull() ?: return
+            if (!parsed.isHttps || parsed.host != expectedHost) return
+            val normalized = parsed.toString()
+            if (queuedSet.size < 14 && queuedSet.add(normalized)) {
+                queue.addLast(normalized)
             }
         }
 
@@ -301,10 +308,10 @@ object EguroClient {
                 discoverScheduleCandidateUrls(pageBody, url).forEach { enqueue(it) }
             }
 
-            val directTimed = parseScheduleFromPayload(pageBody)
-            if (directTimed.isNotEmpty()) {
+            val directClasses = parseScheduleFromPayload(pageBody)
+            if (directClasses.isNotEmpty()) {
                 return@withContext EguroSyncResult(
-                    classes = directTimed,
+                    classes = directClasses,
                     sourcePageUrl = url,
                     usedGeminiFallback = false,
                     checkedPages = checkedPages
@@ -325,7 +332,7 @@ object EguroClient {
             if (text.length < 60) continue
             val aiParsed = runCatching {
                 geminiFallback(context, GeminiHelper.ParseInput.Text(text.take(12_000)))
-            }.getOrNull().orEmpty()
+            }.getOrNull().orEmpty().filterNot { isTermHeading(it.name) }
             if (aiParsed.isNotEmpty()) {
                 return@withContext EguroSyncResult(
                     classes = aiParsed,
@@ -364,6 +371,9 @@ object EguroClient {
             if (jsonBlocks.isNotEmpty()) return jsonBlocks
         }
 
+        val enrolled = parseMyClassList(payload)
+        if (enrolled.isNotEmpty()) return enrolled
+
         // Extract inline JS JSON arrays if embedded inside an HTML page
         val jsonArrayRegex = Regex("""\[\s*\{[\s\S]{10,16000}?\}\s*\]""")
         for (match in jsonArrayRegex.findAll(payload)) {
@@ -375,6 +385,49 @@ object EguroClient {
         if (tableBlocks.isNotEmpty()) return tableBlocks
 
         return parseHtmlTimedCourseCards(payload)
+    }
+
+    private val classRef = Regex("""\bClass\s+Ref(?:erence)?\s*[#:\s]*\d+""", RegexOption.IGNORE_CASE)
+    private val courseCode = Regex("""[A-Za-z][A-Za-z0-9 -]*\s*[- ]?\d+[A-Za-z]?""")
+    private val meeting = Regex("""\(\s*([^|()]+)\|([^|()]+)\|([^|()]*)\)""")
+    private val schedulesLabel = Regex("""\bSchedules?\s*:""", RegexOption.IGNORE_CASE)
+    private val unitsLabel = Regex("""^Units\s*:""", RegexOption.IGNORE_CASE)
+    private val termHeading = Regex("""^(?:fiscal\s+(?:year|yr)|semester)\b""", RegexOption.IGNORE_CASE)
+    private fun isTermHeading(text: String) = termHeading.containsMatchIn(text.trim())
+
+    private fun parseMyClassList(html: String): List<ClassBlock> {
+        if (!html.contains("units", ignoreCase = true)) return emptyList()
+        // List items are fields. Newlines inside the HTML source are only whitespace.
+        val lines = stripHtmlTagsPreservingNewlines(
+            html.replace(Regex("""\s+"""), " ").replace(
+                Regex("""</(?:li|div|p|td|tr|ul|ol)>|<br\s*/?>""", RegexOption.IGNORE_CASE), "\n"
+            )
+        )
+        val result = mutableListOf<ClassBlock>()
+        for ((index, card) in classRef.split(lines).drop(1).withIndex()) {
+            val courseText = card.substringBefore("OPEN CLASS")
+            val scheduleLabel = schedulesLabel.find(courseText)
+            val fields = courseText.take(scheduleLabel?.range?.first ?: courseText.length).lineSequence()
+                .map(String::trim).filter(String::isNotEmpty).toList()
+            val units = fields.indexOfFirst { unitsLabel.containsMatchIn(it) }
+            if (units < 2) continue
+            val code = (units - 2 downTo 0).firstOrNull { courseCode.matches(fields[it]) } ?: continue
+            val title = fields.subList(code + 1, units).joinToString(" ")
+            val professor = fields.getOrNull(units + 1).orEmpty()
+            val course = ClassBlock(name = title, professor = professor,
+                colorHex = CourseColorSwatches[index % CourseColorSwatches.size])
+            val slots = scheduleLabel?.let { courseText.substring(it.range.last + 1) }.orEmpty()
+            val blocks = meeting.findAll(slots).flatMap { match ->
+                val (day, time, room) = match.destructured
+                val (start, duration) = parseTimeRangeMinutes(time) ?: return@flatMap emptySequence()
+                parseDaysFromText(day).asSequence().map {
+                    course.copy(dayOfWeek = it, startHour = start / 60, startMinute = start % 60,
+                        durationMinutes = duration, room = room.trim())
+                }
+            }.toList()
+            result.addAll(blocks.ifEmpty { listOf(course) })
+        }
+        return deduplicateBlocks(result)
     }
 
     internal fun parseJsonEvents(json: String): List<ClassBlock> {
@@ -400,6 +453,7 @@ object EguroClient {
             val name = listOf("title", "subject", "course", "course_name", "subject_name", "class_name", "name")
                 .firstNotNullOfOrNull { k -> obj.optString(k, "").trim().takeIf { it.isNotEmpty() } }
                 ?: continue
+            if (isTermHeading(name)) continue
 
             val room = listOf("room", "location", "venue")
                 .firstNotNullOfOrNull { k -> obj.optString(k, "").trim().takeIf { it.isNotEmpty() } }
@@ -476,6 +530,8 @@ object EguroClient {
                     !cell.equals("course", ignoreCase = true)
             } ?: continue
 
+            if (isTermHeading(nameCell)) continue
+
             val roomCell = extractRoomFromSegments(cells.filter { it != nameCell })
             val profCell = extractProfessorFromSegments(cells.filter { it != nameCell && it != roomCell })
 
@@ -533,6 +589,7 @@ object EguroClient {
                     line.length >= 3
             } ?: continue
 
+            if (isTermHeading(title)) continue
             val room = extractRoomFromSegments(plainLines.filter { it != title })
             val prof = extractProfessorFromSegments(plainLines.filter { it != title && it != room })
             val (startTotal, duration) = timeRange
@@ -590,6 +647,7 @@ object EguroClient {
                     !line.equals("SIGN-IN", ignoreCase = true)
             } ?: continue
 
+            if (isTermHeading(title)) continue
             val prof = extractProfessorFromSegments(plainLines.filter { it != title })
             val color = colorByCourse.getOrPut(title.lowercase(Locale.US)) {
                 CourseColorSwatches[colorByCourse.size % CourseColorSwatches.size]

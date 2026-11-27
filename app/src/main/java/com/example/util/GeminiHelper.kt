@@ -110,6 +110,7 @@ Rules:
 4. durationMinutes: integer minutes (default 60 if duration is unknown).
 5. colorHex: distinct editorial hex colors from '#2E5A4F', '#B85D3B', '#38598B', '#9A6B2F', '#744253', '#4A6B5D', '#5D5179', '#2F6F7E', '#8E443D'. Use the same color for repeated meetings of the same course.
 6. Output ONLY a raw JSON array of objects, with no markdown code fences or prose.
+7. On CCC e-GURO "My Class" pages, each Class Ref identifies one enrolled subject. Use the subject title between the course code and UNITS as its name. Read each (day|start-end|room) under SCHEDULES as a separate meeting of that subject. T is Tuesday, Th is Thursday and S is Saturday. Ignore fiscal year, semester, navigation, quiz/activity counts and Open Class buttons.
 
 Example:
 [
@@ -250,9 +251,10 @@ Example:
             var lastError: Exception? = null
 
             for ((attempt, modelName) in candidateModels.withIndex()) {
-                val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
                 val request = Request.Builder()
                     .url(url)
+                    .header("x-goog-api-key", apiKey)
                     .post(jsonBody.toRequestBody("application/json".toMediaType()))
                     .build()
 
