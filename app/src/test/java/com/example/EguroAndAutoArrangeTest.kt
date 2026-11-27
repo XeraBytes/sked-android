@@ -250,6 +250,57 @@ class EguroAndAutoArrangeTest {
     }
 
     @Test
+    fun myClassImportsAllEightSubjectsAndTheirOwnMeetings(): Unit = runBlocking {
+        val courses = listOf(
+            Triple("CEEL 301", "Graphics Design", "(M|4:00PM-5:30PM|1JMC-CL4) (W|4:00PM-5:30PM|1JMC-CL4) (T|11:00AM-1:00PM|R-4)"),
+            Triple("CEEL 311", "Mobile Application Development", "(M|1:00PM-2:30PM|1JMC-CL3) (W|1:00PM-2:30PM|1JMC-CL3) (Th|7:00AM-9:00AM|R-2)"),
+            Triple("CS 301", "Computer Organization & Assembly Language", "(M|10:00AM-11:30AM|1JMC-CL2) (W|10:00AM-11:30AM|1JMC-CL2) (Th|9:00AM-11:00AM|R-11)"),
+            Triple("CS 311", "Software Engineering 2", "(F|7:00AM-10:00AM|R-10)"),
+            Triple("CS 321", "Visual Programming", "(M|7:00AM-8:30AM|1JMC-CL1) (W|7:00AM-8:30AM|1JMC-CL1) (T|1:00PM-3:00PM|R-5)"),
+            Triple("HCI 301", "Human Computer Interaction", "(T|6:00PM-9:00PM|R-11)"),
+            Triple("RIZAL 301", "The Life and Works of Rizal", "(S|1:00PM-4:00PM|3JMC-7)"),
+            Triple("SQ 301", "Software Quality Assurance", "(S|7:00AM-10:00AM|R-8)")
+        )
+        val banner = "<div class='card-body'><h5>Fiscal Year : 2026-2027 / Semester : 1st Semester</h5></div>"
+        val page = banner + courses.mapIndexed { index, (code, title, slots) ->
+            """
+            <section><table><tr><td>QUIZ</td><td>0</td></tr><tr><td>ACTIVITY</td><td>3</td></tr></table>
+            <ul><li>Class Ref #:${100 + index}</li><li>3-CS1</li><li>$code</li>
+            <li>${title.replace("&", "&amp;")}</li><li>UNITS: 3</li><li>Instructor $index</li></ul>
+            <b>SCHEDULES:</b><ul>${slots.split(" ").joinToString("") { "<li>$it</li>" }}</ul>
+            <button>OPEN CLASS</button></section>
+            """.trimIndent()
+        }.joinToString("")
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            val body = when (request.url.encodedPath) {
+                "/index.php" -> "<input name='token_login_form' value='abc'>"
+                "/app/login.php" -> "$banner<a href='/calendar'>Calendar of Events</a><a href='/enrolled'>My Class</a>"
+                "/enrolled" -> page
+                else -> throw AssertionError("Unexpected page ${request.url.encodedPath}")
+            }
+            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .body(body.toResponseBody("text/html".toMediaType())).build()
+        }.build()
+        val result = EguroClient.loginAndFetchSchedule(
+            ApplicationProvider.getApplicationContext(), "user", "pass", httpClient = client,
+            geminiFallback = { _, _ -> throw AssertionError("Structured cards should parse locally") }
+        )
+        assertEquals(courses.associate { it.second to it.third.split(" ").size }, result.classes.groupingBy { it.name }.eachCount())
+        assertEquals(16, result.classes.size)
+        assertTrue(result.classes.all { it.isScheduled })
+        assertEquals(listOf("1/16/0/90/1JMC-CL4", "3/16/0/90/1JMC-CL4", "2/11/0/120/R-4"),
+            result.classes.filter { it.name == "Graphics Design" }.map { "${it.dayOfWeek}/${it.startHour}/${it.startMinute}/${it.durationMinutes}/${it.room}" })
+        assertTrue(result.classes.any { it.name == courses[1].second && it.dayOfWeek == 4 && it.professor == "Instructor 1" })
+        assertTrue(result.classes.any { it.name == courses.last().second && it.dayOfWeek == 6 && it.startHour == 7 && it.room == "R-8" })
+        assertTrue(EguroClient.parseUntimedCourseCards(banner).isEmpty())
+        val partialPage = page.replace("(S|7:00AM-10:00AM|R-8)", "TBA")
+        val partial = EguroClient.parseScheduleFromPayload(partialPage)
+        assertEquals(15, partial.count { it.isScheduled })
+        assertEquals("Software Quality Assurance", partial.single { !it.isScheduled }.name)
+    }
+
+    @Test
     fun eguroLoginDialog_submitsCredentialsNatively() {
         var submittedUser = ""
         var submittedPass = ""

@@ -7,6 +7,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
 import com.example.ui.dialogs.SettingsDialog
@@ -114,6 +116,35 @@ class UiAfterCaptureTest {
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/after/grid_tablet.png")
     }
 
+    @Test
+    fun large_text_can_place_a_pool_course_on_sunday() {
+        var placedDay: Int? = null
+        val course = sampleClasses.last()
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                ScheduleMakerTheme {
+                    MainScheduleContainer(
+                        classes = sampleClasses,
+                        settings = sampleSettings.copy(showWeekends = true),
+                        activePlacementBlock = course,
+                        gridStyle = "classic",
+                        viewMode = "grid",
+                        onViewModeChange = {},
+                        onClassClick = {},
+                        onStartPlacement = {},
+                        onCancelPlacement = {},
+                        onPlaceBlock = { _, day, _ -> placedDay = day },
+                        onUnscheduleBlock = {},
+                        onAddClassClick = {}
+                    )
+                }
+            }
+        }
+        repeat(6) { composeTestRule.onNodeWithContentDescription("Next days").performClick() }
+        composeTestRule.onNodeWithTag("grid_slot_7_8").assertIsDisplayed().performClick()
+        composeTestRule.runOnIdle { org.junit.Assert.assertEquals(7, placedDay) }
+    }
+
     private fun showSettings() {
         val context = ApplicationProvider.getApplicationContext<Application>()
         composeTestRule.setContent {
@@ -128,7 +159,11 @@ class UiAfterCaptureTest {
         showSettings()
         composeTestRule.onNodeWithTag("settings_dialog").captureRoboImage("src/test/screenshots/after/settings_phone.png")
         composeTestRule.onNodeWithText("Timetable").performClick()
-        composeTestRule.onNodeWithTag("settings_school_name").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_school_name").performTextReplacement("Evening program")
+        composeTestRule.onNodeWithContentDescription("Settings index").performClick()
+        composeTestRule.onNodeWithTag("settings_save_button").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Timetable").performClick()
+        composeTestRule.onNodeWithTag("settings_school_name").assertTextContains("Evening program")
         composeTestRule.onNodeWithContentDescription("Settings index").performClick()
         composeTestRule.onNodeWithText("Updates").performClick()
         composeTestRule.onNodeWithTag("check_updates_button").assertIsDisplayed()

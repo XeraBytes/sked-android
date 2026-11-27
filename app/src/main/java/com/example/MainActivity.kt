@@ -1061,10 +1061,17 @@ fun ScheduleApp(
                     onSuccess = { result ->
                         showEguroDialog = false
                         activeTab = 1
-                        val count = result.classes.size
+                        val subjects = result.classes.distinctBy { it.name.trim().lowercase() }.size
+                        val meetings = result.classes.count { it.isScheduled }
+                        val summary = if (subjects == 0) {
+                            "Signed in to e-GURO. No subjects found."
+                        } else {
+                            "$subjects ${if (subjects == 1) "subject" else "subjects"} · " +
+                                "$meetings scheduled ${if (meetings == 1) "meeting" else "meetings"}"
+                        }
                         Toast.makeText(
                             context,
-                            if (count > 0) "Detected $count classes from CCC e-GURO" else "Signed in to e-GURO (0 classes detected)",
+                            summary,
                             Toast.LENGTH_SHORT
                         ).show()
                     }

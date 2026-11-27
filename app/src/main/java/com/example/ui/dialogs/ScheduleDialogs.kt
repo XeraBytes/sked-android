@@ -2,12 +2,14 @@ package com.example.ui.dialogs
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalDensity
@@ -940,14 +942,18 @@ fun SettingsDialog(
     var showWeekends by rememberSaveable { mutableStateOf(settings.showWeekends) }
 
     // API key & Updater configuration
-    var geminiKey by remember { mutableStateOf(AppPreferences.getCustomGeminiApiKey(context)) }
+    val initialGeminiKey = remember(context) { AppPreferences.getCustomGeminiApiKey(context) }
+    var geminiKey by remember { mutableStateOf(initialGeminiKey) }
     var showGeminiKey by remember { mutableStateOf(false) }
 
     var autoCheckUpdates by remember { mutableStateOf(AppPreferences.isAutoCheckUpdatesEnabled(context)) }
     var showUpdateSourceConfig by remember { mutableStateOf(false) }
-    var repoOwner by rememberSaveable { mutableStateOf(AppPreferences.getUpdateOwner(context)) }
-    var repoName by rememberSaveable { mutableStateOf(AppPreferences.getUpdateRepo(context)) }
-    var repoToken by remember { mutableStateOf(AppPreferences.getUpdateToken(context)) }
+    val initialRepoOwner = remember(context) { AppPreferences.getUpdateOwner(context) }
+    var repoOwner by rememberSaveable { mutableStateOf(initialRepoOwner) }
+    val initialRepoName = remember(context) { AppPreferences.getUpdateRepo(context) }
+    var repoName by rememberSaveable { mutableStateOf(initialRepoName) }
+    val initialRepoToken = remember(context) { AppPreferences.getUpdateToken(context) }
+    var repoToken by remember { mutableStateOf(initialRepoToken) }
     var showRepoToken by remember { mutableStateOf(false) }
 
     var pendingConfirmAction by remember { mutableStateOf<String?>(null) } // "reset" or "clear"
@@ -978,371 +984,377 @@ fun SettingsDialog(
         onDismissRequest = { if (!wideLayout && selected != null) selected = null else onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides planner.inkPrimary) {
-        BoxWithConstraints(
-            Modifier.fillMaxSize().background(planner.paperSheet).safeDrawingPadding().testTag("settings_dialog"),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            val wide = maxWidth >= 680.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
-            val section = selected ?: SettingsSection.Timetable.takeIf { wide }
-            val returnToIndex = section != null && !wide
-            androidx.compose.runtime.SideEffect { wideLayout = wide }
-            Column(Modifier.widthIn(max = 960.dp).fillMaxSize().padding(horizontal = 20.dp)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (returnToIndex) {
-                        IconButton(onClick = { selected = null }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Settings index")
-                        }
-                    }
-                    Text(
-                        if (returnToIndex) section!!.title else "Settings",
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Serif)
-                    )
-                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, "Close settings") }
-                }
-                HorizontalDivider(color = planner.ruleStrong)
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    if (wide || section == null) {
-                        Column(
-                            (if (wide) Modifier.width(220.dp) else Modifier.fillMaxWidth())
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            SettingsSection.entries.forEach { item ->
-                                Row(
-                                    Modifier.fillMaxWidth().clickable { selected = item }
-                                        .background(if (wide && section == item) planner.sageContainer else Color.Transparent)
-                                        .padding(horizontal = 8.dp, vertical = 15.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(item.title, style = MaterialTheme.typography.titleMedium)
-                                        Text(item.summary, style = MaterialTheme.typography.bodySmall, color = planner.inkSecondary)
-                                    }
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = planner.inkSecondary)
-                                }
-                                HorizontalDivider(color = planner.ruleFine)
+        CompositionLocalProvider(LocalContentColor provides planner.inkPrimary) {
+            BoxWithConstraints(
+                Modifier.fillMaxSize().background(planner.paperSheet).safeDrawingPadding().testTag("settings_dialog"),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                val wide = maxWidth >= 680.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+                val section = selected ?: SettingsSection.Timetable.takeIf { wide }
+                val returnToIndex = section != null && !wide
+                SideEffect { wideLayout = wide }
+                Column(Modifier.widthIn(max = 960.dp).fillMaxSize().padding(horizontal = 20.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (returnToIndex) {
+                            IconButton(onClick = { selected = null }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Settings index")
                             }
                         }
+                        Text(
+                            if (returnToIndex) section!!.title else "Settings",
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Serif)
+                        )
+                        IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, "Close settings") }
                     }
-                    if (section != null) key(section) {
-                        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
-                            if (wide) Text(section.title, Modifier.padding(bottom = 16.dp),
-                                style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif))
-                            when (section) {
-                                SettingsSection.Timetable -> {
-                                    Text(
-                                        text = "ACADEMIC HEADER",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = schoolName,
-                                        onValueChange = { schoolName = it },
-                                        label = { Text("School / Program Name") },
-                                        singleLine = true,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 10.dp)
-                                            .testTag("settings_school_name")
-                                    )
-                                    OutlinedTextField(
-                                        value = termName,
-                                        onValueChange = { termName = it },
-                                        label = { Text("Semester / Term") },
-                                        singleLine = true,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 16.dp)
-                                            .testTag("settings_term_details")
-                                    )
-
-                                    Text(
-                                        text = "GRID HOURS",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        HourStepperBox(
-                                            label = "Start",
-                                            hour = startHour,
-                                            onDecrement = { if (startHour > 0) startHour -= 1 },
-                                            onIncrement = { if (startHour < endHour - 1) startHour += 1 },
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        HourStepperBox(
-                                            label = "End",
-                                            hour = endHour,
-                                            onDecrement = { if (endHour > startHour + 1) endHour -= 1 },
-                                            onIncrement = { if (endHour < 23) endHour += 1 },
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-
+                    HorizontalDivider(color = planner.ruleStrong)
+                    Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        if (wide || section == null) {
+                            Column(
+                                (if (wide) Modifier.width(220.dp) else Modifier.fillMaxWidth())
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                SettingsSection.entries.forEach { item ->
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 14.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        Modifier.fillMaxWidth().clickable { selected = item }
+                                            .background(if (wide && section == item) planner.sageContainer else Color.Transparent)
+                                            .padding(horizontal = 8.dp, vertical = 15.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("Include Sunday (Mon–Sun)", style = MaterialTheme.typography.bodyMedium)
-                                        Switch(
-                                            checked = showWeekends,
-                                            onCheckedChange = { showWeekends = it },
-                                            modifier = Modifier.testTag("settings_weekend_switch")
-                                        )
+                                        Column(Modifier.weight(1f)) {
+                                            Text(item.title, style = MaterialTheme.typography.titleMedium)
+                                            Text(item.summary, style = MaterialTheme.typography.bodySmall, color = planner.inkSecondary)
+                                        }
+                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = planner.inkSecondary)
                                     }
-
+                                    HorizontalDivider(color = planner.ruleFine)
                                 }
-                                SettingsSection.Appearance -> {
-                                    Text(
-                                        text = "THEME",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 16.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            .padding(3.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        listOf(
-                                            Triple("light", Icons.Filled.LightMode, "Light"),
-                                            Triple("dark", Icons.Filled.DarkMode, "Dark"),
-                                            Triple("system", Icons.Filled.Contrast, "System")
-                                        ).forEach { (mode, icon, label) ->
-                                            val selected = themeMode == mode
-                                            Surface(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .clickable { onThemeModeChange(mode) },
-                                                color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
-                                                shape = RoundedCornerShape(8.dp),
-                                                border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
-                                            ) {
+                            }
+                        }
+                        if (section != null) key(section) {
+                            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
+                                if (wide) Text(section.title, Modifier.padding(bottom = 16.dp),
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif))
+                                when (section) {
+                                    SettingsSection.Timetable -> {
+                                        Text(
+                                            text = "TERM DETAILS",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        )
+                                        OutlinedTextField(
+                                            value = schoolName,
+                                            onValueChange = { schoolName = it },
+                                            label = { Text("School / Program Name") },
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 10.dp)
+                                                .testTag("settings_school_name")
+                                        )
+                                        OutlinedTextField(
+                                            value = termName,
+                                            onValueChange = { termName = it },
+                                            label = { Text("Semester / Term") },
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 16.dp)
+                                                .testTag("settings_term_details")
+                                        )
+
+                                        Text(
+                                            text = "VISIBLE HOURS",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        )
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            HourStepperBox(
+                                                label = "Start",
+                                                hour = startHour,
+                                                onDecrement = { if (startHour > 0) startHour -= 1 },
+                                                onIncrement = { if (startHour < endHour - 1) startHour += 1 },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            HourStepperBox(
+                                                label = "End",
+                                                hour = endHour,
+                                                onDecrement = { if (endHour > startHour + 1) endHour -= 1 },
+                                                onIncrement = { if (endHour < 23) endHour += 1 },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Include Sunday (Mon–Sun)", style = MaterialTheme.typography.bodyMedium)
+                                            Switch(
+                                                checked = showWeekends,
+                                                onCheckedChange = { showWeekends = it },
+                                                modifier = Modifier.testTag("settings_weekend_switch")
+                                            )
+                                        }
+
+                                    }
+                                    SettingsSection.Appearance -> {
+                                        Text(
+                                            text = "THEME",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 16.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .padding(3.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            listOf(
+                                                Triple("light", Icons.Filled.LightMode, "Light"),
+                                                Triple("dark", Icons.Filled.DarkMode, "Dark"),
+                                                Triple("system", Icons.Filled.Contrast, "System")
+                                            ).forEach { (mode, icon, label) ->
+                                                val selected = themeMode == mode
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .clickable { onThemeModeChange(mode) },
+                                                    color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center,
+                                                        modifier = Modifier.padding(vertical = 8.dp)
+                                                    ) {
+                                                        Icon(
+                                                            icon,
+                                                            contentDescription = null,
+                                                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(15.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(label, style = MaterialTheme.typography.labelMedium)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    SettingsSection.Import -> {
+                                        Text(
+                                            text = "GEMINI EXTRACTION KEY",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+                                        )
+                                        OutlinedTextField(
+                                            value = geminiKey,
+                                            onValueChange = { geminiKey = it },
+                                            label = { Text("Gemini API Key (Optional override)") },
+                                            singleLine = true,
+                                            visualTransformation = if (showGeminiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                            trailingIcon = {
+                                                IconButton(onClick = { showGeminiKey = !showGeminiKey }) {
+                                                    Icon(
+                                                        if (showGeminiKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                        contentDescription = "Toggle key visibility"
+                                                    )
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 12.dp)
+                                        )
+
+                                    }
+                                    SettingsSection.Updates -> {
+                                        Text(
+                                            text = "APP UPDATES",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+                                        )
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(modifier = Modifier.padding(12.dp)) {
                                                 Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    modifier = Modifier.padding(vertical = 8.dp)
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = "Version ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                                                            style = MaterialTheme.typography.titleSmall
+                                                        )
+                                                        Text(
+                                                            text = updateStatusSummary ?: "Source: $repoOwner/$repoName",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                    Button(
+                                                        onClick = {
+                                                            AppPreferences.setUpdateRepository(context, repoOwner, repoName)
+                                                            AppPreferences.setUpdateToken(context, repoToken)
+                                                            onCheckForUpdates()
+                                                        },
+                                                        enabled = !isCheckingUpdates,
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                                        modifier = Modifier.testTag("check_updates_button")
+                                                    ) {
+                                                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(if (isCheckingUpdates) "Checking…" else "Check")
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text("Auto-check on launch", style = MaterialTheme.typography.bodySmall)
+                                                    Switch(
+                                                        checked = autoCheckUpdates,
+                                                        onCheckedChange = {
+                                                            autoCheckUpdates = it
+                                                            AppPreferences.setAutoCheckUpdatesEnabled(context, it)
+                                                        }
+                                                    )
+                                                }
+
+                                                TextButton(
+                                                    onClick = { showUpdateSourceConfig = !showUpdateSourceConfig },
+                                                    contentPadding = PaddingValues(0.dp)
                                                 ) {
                                                     Icon(
-                                                        icon,
+                                                        if (showUpdateSourceConfig) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                                                         contentDescription = null,
-                                                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        modifier = Modifier.size(15.dp)
+                                                        modifier = Modifier.size(16.dp)
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(label, style = MaterialTheme.typography.labelMedium)
+                                                    Text("Release Repository & Token")
                                                 }
-                                            }
-                                        }
-                                    }
-                                }
-                                SettingsSection.Import -> {
-                                    Text(
-                                        text = "GEMINI EXTRACTION KEY",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
-                                    )
-                                    OutlinedTextField(
-                                        value = geminiKey,
-                                        onValueChange = { geminiKey = it },
-                                        label = { Text("Gemini API Key (Optional override)") },
-                                        singleLine = true,
-                                        visualTransformation = if (showGeminiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                                        trailingIcon = {
-                                            IconButton(onClick = { showGeminiKey = !showGeminiKey }) {
-                                                Icon(
-                                                    if (showGeminiKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                                    contentDescription = "Toggle key visibility"
-                                                )
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 12.dp)
-                                    )
 
-                                }
-                                SettingsSection.Updates -> {
-                                    Text(
-                                        text = "APP UPDATES",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
-                                    )
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = "Version ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
-                                                        style = MaterialTheme.typography.titleSmall
-                                                    )
-                                                    Text(
-                                                        text = updateStatusSummary ?: "Source: $repoOwner/$repoName",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                                Button(
-                                                    onClick = {
-                                                        AppPreferences.setUpdateRepository(context, repoOwner, repoName)
-                                                        AppPreferences.setUpdateToken(context, repoToken)
-                                                        onCheckForUpdates()
-                                                    },
-                                                    enabled = !isCheckingUpdates,
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                                    modifier = Modifier.testTag("check_updates_button")
-                                                ) {
-                                                    Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(if (isCheckingUpdates) "Checking…" else "Check")
-                                                }
-                                            }
-
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("Auto-check on launch", style = MaterialTheme.typography.bodySmall)
-                                                Switch(
-                                                    checked = autoCheckUpdates,
-                                                    onCheckedChange = {
-                                                        autoCheckUpdates = it
-                                                        AppPreferences.setAutoCheckUpdatesEnabled(context, it)
+                                                AnimatedVisibility(visible = showUpdateSourceConfig) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        OutlinedTextField(
+                                                            value = repoOwner,
+                                                            onValueChange = { repoOwner = it },
+                                                            label = { Text("GitHub Owner") },
+                                                            singleLine = true,
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        )
+                                                        OutlinedTextField(
+                                                            value = repoName,
+                                                            onValueChange = { repoName = it },
+                                                            label = { Text("GitHub Repository") },
+                                                            singleLine = true,
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        )
+                                                        OutlinedTextField(
+                                                            value = repoToken,
+                                                            onValueChange = { repoToken = it },
+                                                            label = { Text("GitHub Token (only needed for private repos)") },
+                                                            singleLine = true,
+                                                            visualTransformation = if (showRepoToken) VisualTransformation.None else PasswordVisualTransformation(),
+                                                            trailingIcon = {
+                                                                IconButton(onClick = { showRepoToken = !showRepoToken }) {
+                                                                    Icon(
+                                                                        if (showRepoToken) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                                        contentDescription = "Toggle token"
+                                                                    )
+                                                                }
+                                                            },
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        )
                                                     }
-                                                )
-                                            }
-
-                                            TextButton(
-                                                onClick = { showUpdateSourceConfig = !showUpdateSourceConfig },
-                                                contentPadding = PaddingValues(0.dp)
-                                            ) {
-                                                Icon(
-                                                    if (showUpdateSourceConfig) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Release Repository & Token")
-                                            }
-
-                                            AnimatedVisibility(visible = showUpdateSourceConfig) {
-                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    OutlinedTextField(
-                                                        value = repoOwner,
-                                                        onValueChange = { repoOwner = it },
-                                                        label = { Text("GitHub Owner") },
-                                                        singleLine = true,
-                                                        modifier = Modifier.fillMaxWidth()
-                                                    )
-                                                    OutlinedTextField(
-                                                        value = repoName,
-                                                        onValueChange = { repoName = it },
-                                                        label = { Text("GitHub Repository") },
-                                                        singleLine = true,
-                                                        modifier = Modifier.fillMaxWidth()
-                                                    )
-                                                    OutlinedTextField(
-                                                        value = repoToken,
-                                                        onValueChange = { repoToken = it },
-                                                        label = { Text("GitHub Token (only needed for private repos)") },
-                                                        singleLine = true,
-                                                        visualTransformation = if (showRepoToken) VisualTransformation.None else PasswordVisualTransformation(),
-                                                        trailingIcon = {
-                                                            IconButton(onClick = { showRepoToken = !showRepoToken }) {
-                                                                Icon(
-                                                                    if (showRepoToken) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                                                    contentDescription = "Toggle token"
-                                                                )
-                                                            }
-                                                        },
-                                                        modifier = Modifier.fillMaxWidth()
-                                                    )
                                                 }
                                             }
                                         }
-                                    }
 
-                                }
-                                SettingsSection.Data -> {
-                                    Text(
-                                        text = "DATA MAINTENANCE",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        OutlinedButton(
-                                            onClick = { pendingConfirmAction = "reset" },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Load Sample Schedule")
-                                        }
-                                        OutlinedButton(
-                                            onClick = { pendingConfirmAction = "clear" },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-                                        ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Clear All Data")
+                                    }
+                                    SettingsSection.Data -> {
+                                        Text(
+                                            text = "DATA MAINTENANCE",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            OutlinedButton(
+                                                onClick = { pendingConfirmAction = "reset" },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Load Sample Schedule")
+                                            }
+                                            OutlinedButton(
+                                                onClick = { pendingConfirmAction = "clear" },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                                            ) {
+                                                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Clear All Data")
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                HorizontalDivider(color = planner.ruleStrong)
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.End) {
-                    ClayPrimaryButton(
-                        onClick = {
-                            AppPreferences.setCustomGeminiApiKey(context, geminiKey)
-                            AppPreferences.setUpdateRepository(context, repoOwner, repoName)
-                            AppPreferences.setUpdateToken(context, repoToken)
-                            onSave(schoolName, termName, startHour, endHour, showWeekends)
-                        },
-                        modifier = Modifier.testTag("settings_save_button")
-                    ) { Text("Save settings") }
+                    val hasDraft = schoolName != settings.schoolName || termName != settings.termName ||
+                        startHour != settings.startHour || endHour != settings.endHour || showWeekends != settings.showWeekends ||
+                        geminiKey != initialGeminiKey || repoOwner != initialRepoOwner ||
+                        repoName != initialRepoName || repoToken != initialRepoToken
+                    if (hasDraft) {
+                        HorizontalDivider(color = planner.ruleStrong)
+                        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.End) {
+                            ClayPrimaryButton(
+                                onClick = {
+                                    AppPreferences.setCustomGeminiApiKey(context, geminiKey)
+                                    AppPreferences.setUpdateRepository(context, repoOwner, repoName)
+                                    AppPreferences.setUpdateToken(context, repoToken)
+                                    onSave(schoolName, termName, startHour, endHour, showWeekends)
+                                },
+                                modifier = Modifier.testTag("settings_save_button")
+                            ) { Text("Save settings") }
+                        }
+                    }
                 }
             }
-        }
         }
     }
 }
@@ -1355,32 +1367,24 @@ private fun HourStepperBox(
     onIncrement: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    Row(
         modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Row(
+            modifier = Modifier.background(ScheduleTheme.colors.clayInsetTrack, RoundedCornerShape(12.dp)),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                IconButton(onClick = onDecrement, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Remove, contentDescription = "Decrease $label", modifier = Modifier.size(16.dp))
-                }
-                Text(
-                    text = ScheduleLayoutHelper.formatHourShort(hour),
-                    style = MaterialTheme.typography.labelLarge
-                )
-                IconButton(onClick = onIncrement, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Add, contentDescription = "Increase $label", modifier = Modifier.size(16.dp))
-                }
+            IconButton(onClick = onDecrement) {
+                Icon(Icons.Filled.Remove, contentDescription = "Decrease $label", modifier = Modifier.size(16.dp))
+            }
+            Text(
+                ScheduleLayoutHelper.formatHourShort(hour),
+                style = MaterialTheme.typography.labelLarge
+            )
+            IconButton(onClick = onIncrement) {
+                Icon(Icons.Filled.Add, contentDescription = "Increase $label", modifier = Modifier.size(16.dp))
             }
         }
     }
