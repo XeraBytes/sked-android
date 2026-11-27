@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Schedule Maker"
+rootProject.name = "Sked"
 
 include(":app")

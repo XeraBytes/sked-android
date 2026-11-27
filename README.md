@@ -1,21 +1,27 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Sked
 
-# Run and deploy your AI Studio app
+A clean, offline-first class timetable for Android.
 
-This contains everything you need to run your app locally.
+Sked is built around three everyday questions for students: *when is my next class*, *where does an unscheduled course fit*, and *how do I get my timetable in without typing everything by hand*. Everything stays on your device, with a warm paper-style schedule that works in both light and dark mode.
 
-View your app in AI Studio: https://ai.studio/apps/7b471c41-e795-4517-a82e-41e55ff6f8fd
+## What You Can Do
 
-## Run Locally
+- **See your day or your whole week** — Switch between a focused daily timeline and a full weekly grid that keeps overlapping classes legible side by side.
+- **Keep an unscheduled course pool** — Park courses you haven't finalized yet in a pool, place them into open slots with conflict checks, or let Sked arrange free times for you.
+- **Import instead of retyping** — Bring in classes from an image, PDF, or pasted text (using your own Gemini API key), keep an offline reference photo of your timetable, or sync directly from CCC e-GURO.
+- **Export when you need a copy** — Save your schedule as a PDF or image to share or print.
+- **Stay up to date on your terms** — Built-in GitHub Releases checks let you install updates right in the app, remind you later, or skip a version.
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+## Download
 
+Grab the latest APK from [Releases](https://github.com/XeraBytes/sked-android/releases).
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+## Building from Source
+
+Open the project in Android Studio (JDK 21) and run on an emulator or device, or build with Gradle:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+If you want to bundle a default Gemini key at build time for timetable extraction, copy `.env.example` to `.env` and add `GEMINI_API_KEY=...` (otherwise you can add one anytime inside the app's settings).

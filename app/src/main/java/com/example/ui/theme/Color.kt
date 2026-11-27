@@ -2,43 +2,82 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Modern Academic Slate - Light Theme Colors
-val SlatePrimary = Color(0xFF4F46E5)       // Indigo 600
-val SlateOnPrimary = Color(0xFFFFFFFF)
-val SlatePrimaryContainer = Color(0xFFEEF2FF) // Indigo 50
-val SlateOnPrimaryContainer = Color(0xFF312E81) // Indigo 900
-val SlateSecondary = Color(0xFF06B6D4)     // Teal 500
-val SlateSecondaryContainer = Color(0xFFECFEFF) // Teal 50
-val SlateOnSecondaryContainer = Color(0xFF164E63) // Teal 950
-val SlateBackground = Color(0xFFF8FAFC)    // Slate 50
-val SlateSurface = Color(0xFFFFFFFF)
-val SlateSurfaceVariant = Color(0xFFF1F5F9) // Slate 100
-val SlateOnSurface = Color(0xFF0F172A)     // Slate 900
-val SlateOnSurfaceVariant = Color(0xFF475569) // Slate 600
-val SlateOutline = Color(0xFFCBD5E1)       // Slate 300
-val SlateOutlineVariant = Color(0xFFE2E8F0) // Slate 200
+// Light Palette: Warm Ivory Paper, Dark Ink, Muted Sage, Restrained Terracotta
+val PaperPrimary = Color(0xFF476959)
+val PaperOnPrimary = Color(0xFFFCF9F2)
+val PaperPrimaryContainer = Color(0xFFD9E6DF)
+val PaperOnPrimaryContainer = Color(0xFF162C22)
 
-// Modern Academic Slate - Dark Theme Colors
-val SlatePrimaryDark = Color(0xFF818CF8)   // Indigo 400
-val SlateOnPrimaryDark = Color(0xFF1E1B4B) // Indigo 950
-val SlatePrimaryContainerDark = Color(0xFF312E81) // Indigo 900
-val SlateOnPrimaryContainerDark = Color(0xFFE0E7FF) // Indigo 100
-val SlateSecondaryDark = Color(0xFF22D3EE) // Teal 400
-val SlateSecondaryContainerDark = Color(0xFF083344) // Teal 950
-val SlateOnSecondaryContainerDark = Color(0xFFECFEFF) // Teal 50
-val SlateBackgroundDark = Color(0xFF0F172A) // Slate 900
-val SlateSurfaceDark = Color(0xFF1E293B)    // Slate 800
-val SlateSurfaceVariantDark = Color(0xFF334155) // Slate 700
-val SlateOnSurfaceDark = Color(0xFFF8FAFC) // Slate 50
-val SlateOnSurfaceVariantDark = Color(0xFF94A3B8) // Slate 400
-val SlateOutlineDark = Color(0xFF475569)   // Slate 600
-val SlateOutlineVariantDark = Color(0xFF334155) // Slate 700
+val PaperSecondary = Color(0xFFB35433)
+val PaperOnSecondary = Color(0xFFFFFFFF)
+val PaperSecondaryContainer = Color(0xFFF4E0D8)
+val PaperOnSecondaryContainer = Color(0xFF4C1C0D)
 
-// Kept for backward compatibility
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val PaperTertiary = Color(0xFF38598B)
+val PaperTertiaryContainer = Color(0xFFDDE6F2)
+val PaperOnTertiaryContainer = Color(0xFF152742)
 
+val PaperBackground = Color(0xFFF5F0E6)
+val PaperSurface = Color(0xFFFCF9F2)
+val PaperSurfaceVariant = Color(0xFFEBE4D6)
+val PaperOnSurface = Color(0xFF1D1E19)
+val PaperOnSurfaceVariant = Color(0xFF535147)
+val PaperOutline = Color(0xFFC2B9A7)
+val PaperOutlineVariant = Color(0xFFE2DACB)
+
+val PaperClaySurface = Color(0xFFF6F1E7)
+val PaperClayHighlight = Color(0xFFFFFFFF)
+val PaperClayShadow = Color(0xFFD0C7B5)
+val PaperClayInsetTrack = Color(0xFFE5DDD0)
+
+val PaperError = Color(0xFFB42318)
+val PaperOnError = Color(0xFFFFFFFF)
+val PaperErrorContainer = Color(0xFFFBE9E7)
+val PaperOnErrorContainer = Color(0xFF5F140E)
+
+// Dark Palette: Warm Charcoal Paper, Pale Ink, Lighter Sage, Warm Terracotta
+val DeskPrimary = Color(0xFF8FBAA8)
+val DeskOnPrimary = Color(0xFF10241C)
+val DeskPrimaryContainer = Color(0xFF243B32)
+val DeskOnPrimaryContainer = Color(0xFFD7EDE3)
+
+val DeskSecondary = Color(0xFFE08B6B)
+val DeskOnSecondary = Color(0xFF3B170A)
+val DeskSecondaryContainer = Color(0xFF4D2719)
+val DeskOnSecondaryContainer = Color(0xFFFADCD0)
+
+val DeskTertiary = Color(0xFF8FAFD9)
+val DeskTertiaryContainer = Color(0xFF243957)
+val DeskOnTertiaryContainer = Color(0xFFDCE7F7)
+
+val DeskBackground = Color(0xFF151512)
+val DeskSurface = Color(0xFF1E1E19)
+val DeskSurfaceVariant = Color(0xFF292822)
+val DeskOnSurface = Color(0xFFF2EFE7)
+val DeskOnSurfaceVariant = Color(0xFFB5B0A4)
+val DeskOutline = Color(0xFF4D4A40)
+val DeskOutlineVariant = Color(0xFF33312A)
+
+val DeskClaySurface = Color(0xFF2A2923)
+val DeskClayHighlight = Color(0xFF3D3B33)
+val DeskClayShadow = Color(0xFF10100D)
+val DeskClayInsetTrack = Color(0xFF191915)
+
+val DeskError = Color(0xFFF0867D)
+val DeskOnError = Color(0xFF4E110B)
+val DeskErrorContainer = Color(0xFF5E1A14)
+val DeskOnErrorContainer = Color(0xFFFDDAD6)
+
+// Curated pigment swatches for course blocks
+val CourseColorSwatches = listOf(
+    "#2E5A4F", // Pine Ink
+    "#B85D3B", // Terracotta
+    "#38598B", // Prussian Blue
+    "#9A6B2F", // Ochre Brass
+    "#744253", // Burgundy Plum
+    "#4A6B5D", // Sage Moss
+    "#5D5179", // Aubergine
+    "#2F6F7E", // Petrol Teal
+    "#8E443D", // Brick
+    "#565A5C"  // Graphite
+)

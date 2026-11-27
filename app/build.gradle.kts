@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -9,16 +10,54 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+  localProperties.load(localPropertiesFile.inputStream())
+}
+
+fun String.asBuildConfigString(): String =
+  "\"${
+    replace("\\", "\\\\")
+      .replace("\"", "\\\"")
+      .replace("\n", "\\n")
+      .replace("\r", "\\r")
+      .replace("\t", "\\t")
+  }\""
+
+val githubOwner =
+  System.getenv("GITHUB_OWNER")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: localProperties.getProperty("GITHUB_OWNER")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "XeraBytes"
+val githubRepo =
+  System.getenv("GITHUB_REPO")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: localProperties.getProperty("GITHUB_REPO")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "sked-android"
+val releaseGithubOwner =
+  System.getenv("RELEASE_GITHUB_OWNER")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: localProperties.getProperty("RELEASE_GITHUB_OWNER")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: githubOwner
+val releaseGithubRepo =
+  System.getenv("RELEASE_GITHUB_REPO")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: localProperties.getProperty("RELEASE_GITHUB_REPO")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: githubRepo
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.schedulemaker.pxqyw"
+    applicationId = "com.xerabytes.sked"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "1.1.0"
+
+    buildConfigField("boolean", "UPDATER_AVAILABLE", "true")
+    buildConfigField("String", "GITHUB_OWNER", githubOwner.asBuildConfigString())
+    buildConfigField("String", "GITHUB_REPO", githubRepo.asBuildConfigString())
+    buildConfigField("String", "RELEASE_GITHUB_OWNER", releaseGithubOwner.asBuildConfigString())
+    buildConfigField("String", "RELEASE_GITHUB_REPO", releaseGithubRepo.asBuildConfigString())
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -26,16 +65,24 @@ android {
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      val keystoreFile = file(keystorePath)
+      val storePw = System.getenv("STORE_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD")
+      val keyPw = System.getenv("KEY_PASSWORD")
+      val alias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "upload"
+      if (keystoreFile.isFile && !storePw.isNullOrBlank() && !keyPw.isNullOrBlank()) {
+        storeFile = keystoreFile
+        storePassword = storePw
+        keyAlias = alias
+        keyPassword = keyPw
+      }
     }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+    if (file("${rootDir}/debug.keystore").isFile) {
+      create("debugConfig") {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 
@@ -44,9 +91,14 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      val releaseConfig = signingConfigs.getByName("release")
+      if (releaseConfig.storeFile?.isFile == true && !releaseConfig.storePassword.isNullOrBlank()) {
+        signingConfig = releaseConfig
+      }
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      signingConfig = signingConfigs.findByName("debugConfig") ?: signingConfigs.getByName("debug")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -59,8 +111,7 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
+// Load optional secrets (such as GEMINI_API_KEY) from .env
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
@@ -68,17 +119,10 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
-// Some unused dependencies are commented out below instead of being removed.
-// This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
-  // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
-  // implementation(libs.androidx.camera.camera2)
-  // implementation(libs.androidx.camera.core)
-  // implementation(libs.androidx.camera.lifecycle)
-  // implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
@@ -86,33 +130,20 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  // implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  // implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
-  // Uncomment to use Firestore:
-  // implementation(libs.firebase.firestore)
-
-  // Firebase Auth with Google Sign-In requires all of the following to be uncommented together.
-  // If you are using Firebase Auth with other providers (e.g. Email/Password), you may only need
-  // firebase-auth.
-  // implementation(libs.firebase.auth)
-  // implementation(libs.androidx.credentials)
-  // implementation(libs.androidx.credentials.play.services)
-  // implementation(libs.googleid)
   implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

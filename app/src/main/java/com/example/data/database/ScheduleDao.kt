@@ -11,6 +11,9 @@ interface ScheduleDao {
     @Query("SELECT * FROM class_blocks")
     fun getAllClassBlocks(): Flow<List<ClassBlock>>
 
+    @Query("SELECT * FROM class_blocks WHERE id = :id")
+    suspend fun getClassBlock(id: Int): ClassBlock?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertClassBlock(classBlock: ClassBlock): Long
 

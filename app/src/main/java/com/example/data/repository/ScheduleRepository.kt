@@ -9,6 +9,8 @@ class ScheduleRepository(private val scheduleDao: ScheduleDao) {
     val allClassBlocks: Flow<List<ClassBlock>> = scheduleDao.getAllClassBlocks()
     val settings: Flow<ScheduleSettings?> = scheduleDao.getSettings()
 
+    suspend fun getClassBlock(id: Int): ClassBlock? = scheduleDao.getClassBlock(id)
+
     suspend fun insertClassBlock(classBlock: ClassBlock): Long {
         return scheduleDao.insertClassBlock(classBlock)
     }
