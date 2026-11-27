@@ -54,32 +54,32 @@ object ExportHelper {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // Warm off-white archival sheet background
-        canvas.drawColor(Color.parseColor("#F6F4EF"))
+        // Crisp cool studio paper background
+        canvas.drawColor(Color.parseColor("#F2F5F9"))
 
         val bgHeaderPaint = Paint().apply {
-            color = Color.parseColor("#1E3A34")
+            color = Color.parseColor("#163560")
             style = Paint.Style.FILL
             isAntiAlias = true
         }
         val accentStripePaint = Paint().apply {
-            color = Color.parseColor("#B85D3B")
+            color = Color.parseColor("#0D9488")
             style = Paint.Style.FILL
         }
         val textHeaderTitlePaint = Paint().apply {
-            color = Color.parseColor("#F8F7F4")
+            color = Color.parseColor("#F8FAFC")
             textSize = 46f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             isAntiAlias = true
         }
         val textHeaderSubPaint = Paint().apply {
-            color = Color.parseColor("#D8E6E1")
+            color = Color.parseColor("#CBD5E1")
             textSize = 26f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             isAntiAlias = true
         }
         val gridLinePaint = Paint().apply {
-            color = Color.parseColor("#DDD7CC")
+            color = Color.parseColor("#CBD5E1")
             strokeWidth = 2f
             style = Paint.Style.STROKE
         }

@@ -76,7 +76,7 @@ object ScheduleLayoutHelper {
         }
     }
 
-    fun normalizeColorHex(raw: String?, fallback: String = "#2E5A4F"): String {
+    fun normalizeColorHex(raw: String?, fallback: String = "#1E4E8C"): String {
         val trimmed = raw?.trim().orEmpty()
         val withHash = if (trimmed.startsWith("#")) trimmed else "#$trimmed"
         return if (hexColorRegex.matches(withHash)) withHash.uppercase(Locale.US) else fallback

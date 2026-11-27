@@ -108,7 +108,7 @@ Rules:
 2. dayOfWeek: 1 = Monday, 2 = Tuesday, 3 = Wednesday, 4 = Thursday, 5 = Friday, 6 = Saturday, 7 = Sunday, or 0 if unscheduled.
 3. startHour: 0..23 (24-hour clock). startMinute: 0..59.
 4. durationMinutes: integer minutes (default 60 if duration is unknown).
-5. colorHex: distinct editorial hex colors from '#2E5A4F', '#B85D3B', '#38598B', '#9A6B2F', '#744253', '#4A6B5D', '#5D5179', '#2F6F7E', '#8E443D'. Use the same color for repeated meetings of the same course.
+5. colorHex: distinct studio hex colors from '#1E4E8C', '#0E7C7B', '#4338CA', '#047857', '#0369A1', '#7C3AED', '#B45309', '#BE185D', '#334155'. Use the same color for repeated meetings of the same course.
 6. Output ONLY a raw JSON array of objects, with no markdown code fences or prose.
 7. On CCC e-GURO "My Class" pages, each Class Ref identifies one enrolled subject. Use the subject title between the course code and UNITS as its name. Read each (day|start-end|room) under SCHEDULES as a separate meeting of that subject. T is Tuesday, Th is Thursday and S is Saturday. Ignore fiscal year, semester, navigation, quiz/activity counts and Open Class buttons.
 
@@ -122,7 +122,7 @@ Example:
     "startHour": 10,
     "startMinute": 30,
     "durationMinutes": 90,
-    "colorHex": "#2E5A4F"
+    "colorHex": "#1E4E8C"
   }
 ]
 """

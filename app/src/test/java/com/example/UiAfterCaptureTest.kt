@@ -66,7 +66,7 @@ class UiAfterCaptureTest {
             startHour = 9,
             startMinute = 0,
             durationMinutes = 90,
-            colorHex = "#2E5A4F"
+            colorHex = "#1E4E8C"
         ),
         ClassBlock(
             id = 2,
@@ -77,7 +77,7 @@ class UiAfterCaptureTest {
             startHour = 9,
             startMinute = 30,
             durationMinutes = 60,
-            colorHex = "#B85D3B"
+            colorHex = "#0E7C7B"
         ),
         ClassBlock(
             id = 3,

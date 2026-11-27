@@ -68,7 +68,7 @@ class ScheduleLayoutHelperTest {
         assertEquals("12 AM", ScheduleLayoutHelper.formatHourShort(0))
         assertEquals("9:05 AM – 10:35 AM", ScheduleLayoutHelper.formatTimeRange(9, 5, 90))
         assertEquals("1h 30m", ScheduleLayoutHelper.formatDuration(90))
-        assertEquals("#2E5A4F", ScheduleLayoutHelper.normalizeColorHex("not-a-color"))
+        assertEquals("#1E4E8C", ScheduleLayoutHelper.normalizeColorHex("not-a-color"))
         assertEquals("#B85D3B", ScheduleLayoutHelper.normalizeColorHex("b85d3b"))
     }
 }

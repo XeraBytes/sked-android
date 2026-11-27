@@ -56,12 +56,12 @@ import com.example.ui.theme.ScheduleTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val BrandSpruce = Color(0xFF1E3A34)
-private val BrandPine = Color(0xFF2E5A4F)
-private val BrandTerracotta = Color(0xFFB85D3B)
-private val BrandPrussian = Color(0xFF38598B)
-private val BrandPaper = Color(0xFFF6F4EF)
-private val BrandRule = Color(0xFFD8D2C5)
+private val BrandSpruce = Color(0xFF163560)
+private val BrandPine = Color(0xFF1E4E8C)
+private val BrandTerracotta = Color(0xFF0D9488)
+private val BrandPrussian = Color(0xFF4338CA)
+private val BrandPaper = Color(0xFFF8FAFC)
+private val BrandRule = Color(0xFFCBD5E1)
 
 /**
  * Geometric Sked folio emblem matching the adaptive launcher icon,

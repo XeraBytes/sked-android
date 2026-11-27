@@ -4,29 +4,29 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Warm paper timetable folio sheet -->
+    <!-- Cool studio paper timetable folio sheet -->
     <path
-        android:fillColor="#F6F4EF"
+        android:fillColor="#F8FAFC"
         android:pathData="M31,26h46c2.2,0 4,1.8 4,4v48c0,2.2 -1.8,4 -4,4H31c-2.2,0 -4,-1.8 -4,-4V30c0,-2.2 1.8,-4 4,-4z" />
 
-    <!-- Deep spruce ledger header band -->
+    <!-- Deep cobalt ledger header band -->
     <path
-        android:fillColor="#1E3A34"
+        android:fillColor="#163560"
         android:pathData="M27,30v10h54V30c0,-2.2 -1.8,-4 -4,-4H31c-2.2,0 -4,1.8 -4,4z" />
 
-    <!-- Terracotta binding tabs -->
+    <!-- Teal binding tabs -->
     <path
-        android:fillColor="#B85D3B"
+        android:fillColor="#0D9488"
         android:pathData="M37,20h4v10h-4z M52,20h4v10h-4z M67,20h4v10h-4z" />
 
     <!-- Time-blocked cells inside sheet -->
     <path
-        android:fillColor="#2E5A4F"
+        android:fillColor="#1E4E8C"
         android:pathData="M33,47h19v13H33z" />
     <path
-        android:fillColor="#B85D3B"
+        android:fillColor="#0D9488"
         android:pathData="M56,47h19v9H56z" />
     <path
-        android:fillColor="#D8D2C5"
+        android:fillColor="#CBD5E1"
         android:pathData="M33,64h19v10H33z M56,60h19v14H56z" />
 </vector>
