@@ -933,7 +933,8 @@ fun SettingsDialog(
     onSave: (String, String, Int, Int, Boolean) -> Unit,
     onResetDemo: () -> Unit,
     onClearAll: () -> Unit,
-    openImport: Boolean = false
+    openImport: Boolean = false,
+    onOpenWhatsNew: () -> Unit = {}
 ) {
     var schoolName by rememberSaveable { mutableStateOf(settings.schoolName) }
     var termName by rememberSaveable { mutableStateOf(settings.termName) }
@@ -1234,6 +1235,34 @@ fun SettingsDialog(
                                                     }
                                                 }
 
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                var skippedVersion by remember {
+                                                    mutableStateOf(AppPreferences.getSkippedVersion(context))
+                                                }
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    PaperOutlinedButton(
+                                                        onClick = onOpenWhatsNew,
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                                        modifier = Modifier.testTag("settings_whats_new_button")
+                                                    ) {
+                                                        Text("What's New", style = MaterialTheme.typography.labelLarge)
+                                                    }
+                                                    if (!skippedVersion.isNullOrBlank()) {
+                                                        PaperOutlinedButton(
+                                                            onClick = {
+                                                                AppPreferences.setSkippedVersion(context, null)
+                                                                skippedVersion = null
+                                                            },
+                                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                                            modifier = Modifier.testTag("reset_skipped_version_button")
+                                                        ) {
+                                                            Text("Reset skipped (v$skippedVersion)", style = MaterialTheme.typography.labelMedium)
+                                                        }
+                                                    }
+                                                }
                                                 Spacer(modifier = Modifier.height(8.dp))
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),

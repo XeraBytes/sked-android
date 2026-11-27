@@ -104,13 +104,19 @@ import com.example.data.model.getOverlappingClasses
 import com.example.data.prefs.AppPreferences
 import com.example.ui.components.ClayPrimaryButton
 import com.example.ui.components.PaperOutlinedButton
+import com.example.ui.components.SkedLaunchIntro
+import com.example.ui.components.SkedLogoMark
+import com.example.ui.components.SkedTopBarBrand
 import com.example.ui.components.UpdateAvailableDialog
 import com.example.ui.components.UpdateDownloadDialog
+import com.example.ui.components.UpdateErrorDialog
+import com.example.ui.components.WhatsNewDialog
 import com.example.ui.dialogs.ClassEditDialog
 import com.example.ui.dialogs.ClassQuickActionsDialog
 import com.example.ui.dialogs.EguroLoginDialog
 import com.example.ui.dialogs.SettingsDialog
 import com.example.ui.screens.ClassPoolView
+import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MainScheduleContainer
 import com.example.ui.screens.ScreenshotReferenceView
 import com.example.ui.theme.ScheduleMakerTheme
@@ -148,6 +154,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     ScheduleApp(
                         themeMode = themeMode,
+                        showLaunchIntro = true,
+                        showWhatsNewIfUpdated = true,
                         onThemeModeChange = { newMode ->
                             themeMode = newMode
                             AppPreferences.setThemeMode(this, newMode)
@@ -198,6 +206,13 @@ fun getFileName(context: Context, uri: Uri): String {
     return result ?: "Selected file"
 }
 
+enum class SkedTab(val label: String, val testTag: String) {
+    Home("Home", "nav_tab_home"),
+    Schedule("Schedule", "nav_tab_grid"),
+    Import("Import", "nav_tab_screenshot"),
+    Pool("Pool", "nav_tab_pool")
+}
+
 data class ConflictData(
     val block: ClassBlock,
     val day: Int,
@@ -210,6 +225,9 @@ data class ConflictData(
 @Composable
 fun ScheduleApp(
     themeMode: String = "system",
+    showLaunchIntro: Boolean = false,
+    showWhatsNewIfUpdated: Boolean = false,
+    initialTab: SkedTab = SkedTab.Home,
     onThemeModeChange: (String) -> Unit = {},
     viewModel: ScheduleViewModel = viewModel()
 ) {
@@ -225,7 +243,8 @@ fun ScheduleApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    var activeTab by rememberSaveable { mutableIntStateOf(0) }
+    var introActive by rememberSaveable(showLaunchIntro) { mutableStateOf(showLaunchIntro) }
+    var activeTab by rememberSaveable { mutableStateOf(initialTab) }
     var gridStyle by rememberSaveable { mutableStateOf("classic") }
     var viewMode by rememberSaveable { mutableStateOf("timeline") }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
@@ -262,6 +281,12 @@ fun ScheduleApp(
 
     LaunchedEffect(Unit) {
         viewModel.runStartupUpdateCheckIfNeeded(context)
+    }
+
+    LaunchedEffect(introActive, showWhatsNewIfUpdated) {
+        if (!introActive && showWhatsNewIfUpdated) {
+            viewModel.checkWhatsNewOnLaunch(context)
+        }
     }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -302,27 +327,62 @@ fun ScheduleApp(
         }
     }
 
+    val performAutoArrange: () -> Unit = {
+        viewModel.autoArrangePool { placedCount, remainingCount ->
+            scope.launch {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                val msg = when {
+                    placedCount == 0 -> "No conflict-free slots available within grid hours"
+                    remainingCount == 0 -> "Auto-arranged $placedCount ${if (placedCount == 1) "course" else "courses"}"
+                    else -> "Auto-arranged $placedCount courses ($remainingCount left in pool)"
+                }
+                val res = snackbarHostState.showSnackbar(
+                    message = msg,
+                    actionLabel = if (placedCount > 0) "Undo" else null,
+                    duration = SnackbarDuration.Short
+                )
+                if (res == SnackbarResult.ActionPerformed && placedCount > 0) {
+                    viewModel.undo()
+                }
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = planner.paperBackground,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = settings.schoolName,
-                            style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif),
-                            color = planner.inkPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    if (activeTab == SkedTab.Home) {
+                        SkedTopBarBrand(
+                            subtitle = settings.termName,
+                            onClick = { introActive = true }
                         )
-                        Text(
-                            text = settings.termName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = planner.inkSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SkedLogoMark(
+                                size = 24.dp,
+                                modifier = Modifier.padding(end = 10.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = settings.schoolName,
+                                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif),
+                                    color = planner.inkPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = settings.termName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = planner.inkSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {
@@ -428,7 +488,7 @@ fun ScheduleApp(
                                 leadingIcon = { Icon(Icons.Filled.PictureAsPdf, contentDescription = null) },
                                 modifier = Modifier.testTag("export_pdf_button")
                             )
-                            if (activeTab == 0 && viewMode == "grid") {
+                            if (activeTab == SkedTab.Schedule && viewMode == "grid") {
                                 HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text(if (gridStyle == "classic") "Card Style: Neutral Paper" else "Card Style: Color Tinted") },
@@ -524,19 +584,18 @@ fun ScheduleApp(
                     Modifier.fillMaxWidth().selectableGroup().testTag("bottom_nav_bar"),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val tabs = listOf("Schedule" to "nav_tab_grid", "Import" to "nav_tab_screenshot", "Pool" to "nav_tab_pool")
-                    tabs.forEachIndexed { index, (label, tag) ->
-                        val selected = activeTab == index
+                    SkedTab.entries.forEach { tab ->
+                        val selected = activeTab == tab
                         Column(
-                            Modifier.weight(1f).selectable(selected, role = Role.Tab, onClick = { activeTab = index })
-                                .testTag(tag).padding(horizontal = 4.dp),
+                            Modifier.weight(1f).selectable(selected, role = Role.Tab, onClick = { activeTab = tab })
+                                .testTag(tab.testTag).padding(horizontal = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Spacer(Modifier.width(32.dp).height(3.dp)
                                 .background(if (selected) planner.sagePrimary else Color.Transparent))
                             Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
                                 Text(
-                                    if (index == 2 && poolCount > 0) "$label ($poolCount)" else label,
+                                    if (tab == SkedTab.Pool && poolCount > 0) "${tab.label} ($poolCount)" else tab.label,
                                     style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Serif),
                                     color = if (selected) planner.inkPrimary else planner.inkSecondary,
                                     textAlign = TextAlign.Center
@@ -548,7 +607,7 @@ fun ScheduleApp(
             }
         },
         floatingActionButton = {
-            if (activeTab == 0 && activePlacementBlock == null) {
+            if (activeTab == SkedTab.Schedule && activePlacementBlock == null) {
                 FloatingActionButton(
                     onClick = { showAddDialog = true },
                     containerColor = planner.sagePrimary,
@@ -572,7 +631,33 @@ fun ScheduleApp(
                 label = "TabTransition"
             ) { targetTab ->
                 when (targetTab) {
-                    0 -> MainScheduleContainer(
+                    SkedTab.Home -> HomeScreen(
+                        classes = classes,
+                        settings = settings,
+                        onOpenScheduleGrid = {
+                            viewMode = "grid"
+                            activeTab = SkedTab.Schedule
+                        },
+                        onOpenDailyAgenda = {
+                            viewMode = "timeline"
+                            activeTab = SkedTab.Schedule
+                        },
+                        onOpenEguroSync = {
+                            viewModel.clearEguroError()
+                            showEguroDialog = true
+                        },
+                        onOpenImport = { activeTab = SkedTab.Import },
+                        onOpenPool = { activeTab = SkedTab.Pool },
+                        onAutoArrangePool = performAutoArrange,
+                        onAddClassClick = { showAddDialog = true },
+                        onClassClick = { block ->
+                            if (block.isScheduled) quickActionClassId = block.id
+                            else editingClassId = block.id
+                        },
+                        onReplayIntro = { introActive = true }
+                    )
+
+                    SkedTab.Schedule -> MainScheduleContainer(
                         classes = classes,
                         settings = settings,
                         activePlacementBlock = activePlacementBlock,
@@ -610,10 +695,10 @@ fun ScheduleApp(
                         },
                         onUnscheduleBlock = performUnscheduleWithUndo,
                         onAddClassClick = { showAddDialog = true },
-                        onChooseFromPoolClick = { activeTab = 2 }
+                        onChooseFromPoolClick = { activeTab = SkedTab.Pool }
                     )
 
-                    1 -> ScreenshotReferenceView(
+                    SkedTab.Import -> ScreenshotReferenceView(
                         settings = settings,
                         viewModel = viewModel,
                         onImportClick = { imagePickerLauncher.launch("image/*") },
@@ -629,7 +714,7 @@ fun ScheduleApp(
                             Toast.makeText(context, "Reference image cleared", Toast.LENGTH_SHORT).show()
                         },
                         onOpenSettingsClick = { openImportSettings = true; showSettingsDialog = true },
-                        onAiImportCompleted = { activeTab = 0 },
+                        onAiImportCompleted = { activeTab = SkedTab.Schedule },
                         resolveFileName = { uri -> getFileName(context, uri) },
                         onClassesSaved = { savedCount ->
                             scope.launch {
@@ -646,12 +731,12 @@ fun ScheduleApp(
                         }
                     )
 
-                    2 -> ClassPoolView(
+                    SkedTab.Pool -> ClassPoolView(
                         classes = classes,
                         onClassClick = { editingClassId = it.id },
                         onScheduleClick = { block ->
                             activePlacementBlockId = block.id
-                            activeTab = 0
+                            activeTab = SkedTab.Schedule
                         },
                         onDeleteClick = { block ->
                             viewModel.deleteClassBlockById(block.id)
@@ -667,32 +752,13 @@ fun ScheduleApp(
                                 }
                             }
                         },
-                        onAutoArrangeClick = {
-                            viewModel.autoArrangePool { placedCount, remainingCount ->
-                                scope.launch {
-                                    snackbarHostState.currentSnackbarData?.dismiss()
-                                    val msg = when {
-                                        placedCount == 0 -> "No conflict-free slots available within grid hours"
-                                        remainingCount == 0 -> "Auto-arranged $placedCount ${if (placedCount == 1) "course" else "courses"}"
-                                        else -> "Auto-arranged $placedCount courses ($remainingCount left in pool)"
-                                    }
-                                    val res = snackbarHostState.showSnackbar(
-                                        message = msg,
-                                        actionLabel = if (placedCount > 0) "Undo" else null,
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    if (res == SnackbarResult.ActionPerformed && placedCount > 0) {
-                                        viewModel.undo()
-                                    }
-                                }
-                            }
-                        }
+                        onAutoArrangeClick = performAutoArrange
                     )
                 }
             }
 
             // Weekly Sheet Placement Instruction Banner (carries course name, duration, and reachable Cancel)
-            if (activePlacementBlock != null && (activeTab != 0 || viewMode == "grid")) {
+            if (activePlacementBlock != null && (activeTab != SkedTab.Schedule || viewMode == "grid")) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -859,6 +925,10 @@ fun ScheduleApp(
                 viewModel.clearAllData()
                 showSettingsDialog = false
                 Toast.makeText(context, "All classes cleared", Toast.LENGTH_SHORT).show()
+            },
+            onOpenWhatsNew = {
+                showSettingsDialog = false
+                viewModel.openWhatsNewDialog(context)
             }
         )
     }
@@ -1032,7 +1102,35 @@ fun ScheduleApp(
             },
             onGrantPermissionClick = { AppUpdateInstaller.openInstallPermissionSettings(context) },
             onSkipVersion = { viewModel.skipUpdateVersion(context) },
-            onDismiss = { viewModel.dismissUpdateDialog() }
+            onDismiss = { viewModel.dismissUpdateDialog() },
+            onOpenReleasePage = {
+                val targetUrl = update.release.htmlUrl.ifBlank {
+                    "https://github.com/${AppPreferences.getUpdateOwner(context)}/${AppPreferences.getUpdateRepo(context)}/releases"
+                }
+                AppUpdateInstaller.openReleasePage(context, targetUrl)
+            }
+        )
+    }
+
+    if (updaterState.showWhatsNewDialog) {
+        WhatsNewDialog(
+            versionName = BuildConfig.VERSION_NAME,
+            notes = updaterState.whatsNewNotes,
+            onDontShowAgain = { viewModel.dismissWhatsNewDialog(context, dontShowAgain = true) },
+            onDismiss = { viewModel.dismissWhatsNewDialog(context, dontShowAgain = false) }
+        )
+    }
+
+    if (updaterState.updateError != null) {
+        val releaseUrl = updaterState.updateErrorReleaseUrl.orEmpty()
+        UpdateErrorDialog(
+            message = updaterState.updateError!!,
+            hasReleaseUrl = releaseUrl.startsWith("https://", ignoreCase = true),
+            onOpenReleasePage = {
+                viewModel.clearUpdateError()
+                AppUpdateInstaller.openReleasePage(context, releaseUrl)
+            },
+            onDismiss = { viewModel.clearUpdateError() }
         )
     }
 
@@ -1060,7 +1158,7 @@ fun ScheduleApp(
                     customSchedulePath = path,
                     onSuccess = { result ->
                         showEguroDialog = false
-                        activeTab = 1
+                        activeTab = SkedTab.Import
                         val subjects = result.classes.distinctBy { it.name.trim().lowercase() }.size
                         val meetings = result.classes.count { it.isScheduled }
                         val summary = if (subjects == 0) {
@@ -1082,5 +1180,10 @@ fun ScheduleApp(
                 showEguroDialog = false
             }
         )
+    }
+
+    if (introActive) {
+        SkedLaunchIntro(onFinished = { introActive = false })
+    }
     }
 }

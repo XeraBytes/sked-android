@@ -2,6 +2,7 @@ package com.example.updater
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -15,6 +16,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 
@@ -115,6 +117,16 @@ object AppUpdateInstaller {
                 throw IOException("Downloaded file is not a valid Android APK package.")
             }
 
+            if (!isApkSigned(tempFile)) {
+                tempFile.delete()
+                throw IOException("This release APK is unsigned and cannot be installed by Android. Configure release signing or open the release page.")
+            }
+
+            if (!verifySignatureCompatibility(context, tempFile)) {
+                tempFile.delete()
+                throw IOException("Release APK signing key differs from this installed build. Uninstall this build first or install from GitHub Releases.")
+            }
+
             if (!tempFile.renameTo(apkFile)) {
                 tempFile.copyTo(apkFile, overwrite = true)
                 tempFile.delete()
@@ -131,6 +143,15 @@ object AppUpdateInstaller {
         }
     }
 
+    fun openReleasePage(context: Context, url: String) {
+        val clean = url.trim()
+        if (!clean.startsWith("https://", ignoreCase = true)) return
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(clean)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching { context.startActivity(intent) }
+    }
+
     private suspend fun emitProgress(
         downloadedBytes: Long,
         totalBytes: Long,
@@ -144,6 +165,66 @@ object AppUpdateInstaller {
     private fun containsApkManifest(file: File): Boolean = runCatching {
         ZipFile(file).use { zip -> zip.getEntry("AndroidManifest.xml") != null }
     }.getOrDefault(false)
+
+    internal fun isApkSigned(file: File): Boolean = runCatching {
+        val hasV1Sig = ZipFile(file).use { zip ->
+            val entries = zip.entries()
+            var found = false
+            while (entries.hasMoreElements()) {
+                val name = entries.nextElement().name
+                if (name.startsWith("META-INF/", ignoreCase = true) &&
+                    (name.endsWith(".RSA", ignoreCase = true) ||
+                        name.endsWith(".DSA", ignoreCase = true) ||
+                        name.endsWith(".EC", ignoreCase = true))
+                ) {
+                    found = true
+                    break
+                }
+            }
+            found
+        }
+        if (hasV1Sig) return@runCatching true
+
+        // Check APK Signature Scheme v2/v3 magic ("APK Sig Block 42")
+        val magic = "APK Sig Block 42".toByteArray(Charsets.US_ASCII)
+        RandomAccessFile(file, "r").use { raf ->
+            val len = raf.length()
+            if (len < 64L) return@use false
+            val scanSize = minOf(len, 256L * 1024L).toInt()
+            val buf = ByteArray(scanSize)
+            raf.seek(len - scanSize)
+            raf.readFully(buf)
+            outer@ for (i in 0..(buf.size - magic.size)) {
+                for (j in magic.indices) {
+                    if (buf[i + j] != magic[j]) continue@outer
+                }
+                return@use true
+            }
+            false
+        }
+    }.getOrDefault(false)
+
+    @Suppress("DEPRECATION")
+    private fun verifySignatureCompatibility(context: Context, apkFile: File): Boolean = runCatching {
+        val pm = context.packageManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val installed = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            val archive = pm.getPackageArchiveInfo(apkFile.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES)
+                ?: return@runCatching true
+            val installedSet = installed.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            val archiveSet = archive.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            if (installedSet.isEmpty() || archiveSet.isEmpty()) return@runCatching true
+            installedSet.any { it in archiveSet }
+        } else {
+            val installed = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+            val archive = pm.getPackageArchiveInfo(apkFile.absolutePath, PackageManager.GET_SIGNATURES)
+                ?: return@runCatching true
+            val installedSet = installed.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+            val archiveSet = archive.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+            if (installedSet.isEmpty() || archiveSet.isEmpty()) return@runCatching true
+            installedSet.any { it in archiveSet }
+        }
+    }.getOrDefault(true)
 
     private fun launchApkInstaller(context: Context, apkFile: File) {
         val uri = FileProvider.getUriForFile(

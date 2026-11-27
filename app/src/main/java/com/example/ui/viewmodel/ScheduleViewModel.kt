@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import com.example.BuildConfig
 import com.example.data.database.ScheduleDatabase
 import com.example.data.model.ClassBlock
 import com.example.data.model.ScheduleSettings
@@ -61,8 +62,12 @@ data class UpdaterUiState(
     val availableUpdate: UpdateCheckResult.UpdateAvailable? = null,
     val showUpdateDialog: Boolean = false,
     val updateStatusSummary: String? = null,
+    val updateError: String? = null,
+    val updateErrorReleaseUrl: String? = null,
     val downloadProgress: AppUpdateInstaller.Progress? = null,
-    val downloadingRelease: ReleaseInfo? = null
+    val downloadingRelease: ReleaseInfo? = null,
+    val showWhatsNewDialog: Boolean = false,
+    val whatsNewNotes: List<String> = emptyList()
 )
 
 data class EguroUiState(
@@ -113,6 +118,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     val eguroState: StateFlow<EguroUiState> = _eguroState.asStateFlow()
 
     private var hasRunStartupUpdateCheck = false
+    private var hasCheckedWhatsNewOnLaunch = false
     private var downloadJob: Job? = null
 
     init {
@@ -475,6 +481,71 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun checkWhatsNewOnLaunch(context: Context) {
+        if (hasCheckedWhatsNewOnLaunch) return
+        hasCheckedWhatsNewOnLaunch = true
+        val appContext = context.applicationContext ?: context
+        if (AppPreferences.isWhatsNewDontShowAgain(appContext)) return
+        val seenCode = AppPreferences.getLastSeenWhatsNewVersionCode(appContext)
+        if (BuildConfig.VERSION_CODE > seenCode) {
+            _updaterState.update {
+                it.copy(
+                    showWhatsNewDialog = true,
+                    whatsNewNotes = resolveCurrentVersionWhatsNewNotes(appContext)
+                )
+            }
+        }
+    }
+
+    fun openWhatsNewDialog(context: Context) {
+        val appContext = context.applicationContext ?: context
+        _updaterState.update {
+            it.copy(
+                showWhatsNewDialog = true,
+                whatsNewNotes = resolveCurrentVersionWhatsNewNotes(appContext)
+            )
+        }
+    }
+
+    fun dismissWhatsNewDialog(context: Context, dontShowAgain: Boolean) {
+        val appContext = context.applicationContext ?: context
+        AppPreferences.setLastSeenWhatsNewVersionCode(appContext, BuildConfig.VERSION_CODE)
+        if (dontShowAgain) {
+            AppPreferences.setWhatsNewDontShowAgain(appContext, true)
+        }
+        _updaterState.update { it.copy(showWhatsNewDialog = false) }
+    }
+
+    fun clearUpdateError() {
+        _updaterState.update { it.copy(updateError = null, updateErrorReleaseUrl = null) }
+    }
+
+    fun clearSkippedVersion(context: Context) {
+        val appContext = context.applicationContext ?: context
+        AppPreferences.setSkippedVersion(appContext, null)
+    }
+
+    private fun resolveCurrentVersionWhatsNewNotes(context: Context): List<String> {
+        val cachedJson = AppPreferences.getCachedReleasesJson(context)
+        val cachedNotes = cachedJson?.takeIf { it.isNotBlank() }?.let { raw ->
+            runCatching { AppUpdater.parseReleasesJson(raw) }.getOrNull()
+        }?.firstOrNull { release ->
+            AppUpdater.getReleaseVersionName(release) == BuildConfig.VERSION_NAME
+        }?.body?.lines()?.mapNotNull { line ->
+            val cleaned = line.trim().removePrefix("- ").removePrefix("* ").trim()
+            cleaned.takeIf { it.isNotBlank() && !it.startsWith("#") }
+        }.orEmpty()
+
+        if (cachedNotes.isNotEmpty()) return cachedNotes
+        return listOf(
+            "Home tab with live Next Class spotlight and quick workspace shortcuts",
+            "Animated Sked folio launch intro and header brand emblem",
+            "CCC e-GURO My Class parser supporting all subjects, T vs Th, Saturday & TBA",
+            "Editorial paper Settings layout and responsive Weekly Sheet navigation",
+            "In-app updater What's New dialog with Don't show again & GitHub fallback"
+        )
+    }
+
     fun triggerUpdateCheck(
         context: Context,
         manual: Boolean,
@@ -482,7 +553,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     ) {
         if (_updaterState.value.isCheckingUpdates) return
         val appContext = context.applicationContext ?: context
-        _updaterState.update { it.copy(isCheckingUpdates = true) }
+        _updaterState.update { it.copy(isCheckingUpdates = true, updateError = null, updateErrorReleaseUrl = null) }
 
         viewModelScope.launch {
             val res = AppUpdater.checkForUpdates(appContext, forceRefresh = manual)
@@ -511,10 +582,14 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
                 is UpdateCheckResult.Error -> {
+                    val owner = AppPreferences.getUpdateOwner(appContext)
+                    val repo = AppPreferences.getUpdateRepo(appContext)
                     _updaterState.update {
                         it.copy(
                             isCheckingUpdates = false,
-                            updateStatusSummary = res.message
+                            updateStatusSummary = res.message,
+                            updateError = if (manual) res.message else null,
+                            updateErrorReleaseUrl = if (manual) "https://github.com/$owner/$repo/releases" else null
                         )
                     }
                     if (manual) {
@@ -551,6 +626,8 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         _updaterState.update {
             it.copy(
                 showUpdateDialog = false,
+                updateError = null,
+                updateErrorReleaseUrl = null,
                 downloadingRelease = release,
                 downloadProgress = AppUpdateInstaller.Progress(0L, release.asset?.sizeBytes ?: -1L)
             )
@@ -559,14 +636,26 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             val result = AppUpdateInstaller.downloadAndInstall(appContext, release) { prog ->
                 _updaterState.update { it.copy(downloadProgress = prog) }
             }
-            _updaterState.update {
-                it.copy(
-                    downloadingRelease = null,
-                    downloadProgress = null
-                )
-            }
             result.onFailure { err ->
-                onFailure(err.localizedMessage ?: "Failed to install update")
+                val msg = err.localizedMessage ?: "Failed to install update"
+                val owner = AppPreferences.getUpdateOwner(appContext)
+                val repo = AppPreferences.getUpdateRepo(appContext)
+                _updaterState.update {
+                    it.copy(
+                        downloadingRelease = null,
+                        downloadProgress = null,
+                        updateError = msg,
+                        updateErrorReleaseUrl = release.htmlUrl.ifBlank { "https://github.com/$owner/$repo/releases" }
+                    )
+                }
+                onFailure(msg)
+            }.onSuccess {
+                _updaterState.update {
+                    it.copy(
+                        downloadingRelease = null,
+                        downloadProgress = null
+                    )
+                }
             }
         }
     }

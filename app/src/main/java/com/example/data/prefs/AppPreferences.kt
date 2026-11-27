@@ -19,6 +19,8 @@ object AppPreferences {
     private const val KEY_RELEASES_JSON = "cached_releases_json"
     private const val KEY_RELEASES_ETAG = "cached_releases_etag"
     private const val KEY_SKIPPED_VERSION = "skipped_update_version"
+    private const val KEY_WHATS_NEW_SEEN_VERSION_CODE = "whats_new_seen_version_code"
+    private const val KEY_WHATS_NEW_DONT_SHOW_AGAIN = "whats_new_dont_show_again"
     private const val KEY_EGURO_USERNAME = "eguro_username"
     private const val KEY_EGURO_SCHEDULE_PATH = "eguro_schedule_path"
     private const val KEY_EGURO_LAST_SYNC_MS = "eguro_last_sync_ms"
@@ -123,6 +125,20 @@ object AppPreferences {
         prefs(context).edit().apply {
             if (version.isNullOrBlank()) remove(KEY_SKIPPED_VERSION) else putString(KEY_SKIPPED_VERSION, version.trim())
         }.apply()
+    }
+
+    fun getLastSeenWhatsNewVersionCode(context: Context): Int =
+        prefs(context).getInt(KEY_WHATS_NEW_SEEN_VERSION_CODE, 0)
+
+    fun setLastSeenWhatsNewVersionCode(context: Context, versionCode: Int) {
+        prefs(context).edit().putInt(KEY_WHATS_NEW_SEEN_VERSION_CODE, versionCode).apply()
+    }
+
+    fun isWhatsNewDontShowAgain(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_WHATS_NEW_DONT_SHOW_AGAIN, false)
+
+    fun setWhatsNewDontShowAgain(context: Context, suppressed: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WHATS_NEW_DONT_SHOW_AGAIN, suppressed).apply()
     }
 
     fun getEguroUsername(context: Context): String =

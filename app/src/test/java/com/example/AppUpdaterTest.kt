@@ -9,10 +9,15 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.prefs.AppPreferences
 import com.example.ui.components.UpdateAvailableDialog
+import com.example.ui.components.WhatsNewDialog
 import com.example.ui.theme.ScheduleMakerTheme
+import com.example.updater.AppUpdateInstaller
 import com.example.updater.AppUpdater
 import com.example.updater.ReleaseAsset
 import com.example.updater.ReleaseInfo
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -129,11 +134,11 @@ class AppUpdaterTest {
     }
 
     @Test
-    fun `update dialog displays sage Update now, Later, and Skip this version`() {
+    fun `update dialog displays Whats New, Update now, Later, and Dont show again`() {
         val release = ReleaseInfo(
             tagName = "v1.2.0",
             name = "1.2.0",
-            body = "Release notes item",
+            body = "## Sked v1.2.0\n\n- Added Home page & folio intro\n- Fixed release notes formatting",
             publishedAt = "2026-11-26T00:00:00Z",
             htmlUrl = "https://github.com/example/repo/releases/tag/v1.2.0",
             isPrerelease = false,
@@ -154,18 +159,72 @@ class AppUpdaterTest {
                     onInstallClick = { action = "update" },
                     onGrantPermissionClick = {},
                     onSkipVersion = { action = "skip" },
-                    onDismiss = { action = "later" }
+                    onDismiss = { action = "later" },
+                    onOpenReleasePage = { action = "github" }
                 )
             }
         }
 
+        composeTestRule.onNodeWithText("WHAT'S NEW").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Added Home page & folio intro").assertIsDisplayed()
         composeTestRule.onNodeWithText("Update now").assertIsDisplayed().performClick()
         assertEquals("update", action)
 
         composeTestRule.onNodeWithText("Later").assertIsDisplayed().performClick()
         assertEquals("later", action)
 
-        composeTestRule.onNodeWithText("Skip this version").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText("Don't show again").assertIsDisplayed().performClick()
         assertEquals("skip", action)
+    }
+
+    @Test
+    fun `whats new dialog displays notes and Dont show again persists preference`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        AppPreferences.setWhatsNewDontShowAgain(context, false)
+        var result = ""
+        composeTestRule.setContent {
+            ScheduleMakerTheme {
+                WhatsNewDialog(
+                    versionName = "1.1.0",
+                    notes = listOf("Home screen launch intro", "Updater release notes"),
+                    onDontShowAgain = {
+                        AppPreferences.setWhatsNewDontShowAgain(context, true)
+                        result = "dont_show"
+                    },
+                    onDismiss = { result = "got_it" }
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("whats_new_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithText("WHAT'S NEW").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Home screen launch intro").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("whats_new_dont_show_again_button").performClick()
+        assertEquals("dont_show", result)
+        assertTrue(AppPreferences.isWhatsNewDontShowAgain(context))
+    }
+
+    @Test
+    fun `isApkSigned rejects unsigned archive and accepts v1 signed archive`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val unsignedApk = File(context.cacheDir, "unsigned-test.apk")
+        ZipOutputStream(unsignedApk.outputStream()).use { zip ->
+            zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
+            zip.write(byteArrayOf(1, 2, 3))
+            zip.closeEntry()
+        }
+        assertFalse(AppUpdateInstaller.isApkSigned(unsignedApk))
+
+        val signedApk = File(context.cacheDir, "signed-test.apk")
+        ZipOutputStream(signedApk.outputStream()).use { zip ->
+            zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
+            zip.write(byteArrayOf(1, 2, 3))
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("META-INF/CERT.RSA"))
+            zip.write(byteArrayOf(4, 5, 6))
+            zip.closeEntry()
+        }
+        assertTrue(AppUpdateInstaller.isApkSigned(signedApk))
+        unsignedApk.delete()
+        signedApk.delete()
     }
 }

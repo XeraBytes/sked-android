@@ -19,9 +19,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NewReleases
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -46,9 +49,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
@@ -167,6 +172,19 @@ fun ConfirmDangerDialog(
     )
 }
 
+internal fun formatChangelogItems(markdown: String): List<String> {
+    return markdown
+        .lines()
+        .mapNotNull { raw ->
+            val trimmed = raw.trim()
+            if (trimmed.isBlank()) return@mapNotNull null
+            if (trimmed.startsWith("#")) return@mapNotNull null
+            trimmed.removePrefix("- ").removePrefix("* ").removePrefix("• ").trim()
+                .takeIf { it.isNotBlank() }
+        }
+        .ifEmpty { listOf("Bug fixes, improvements, and updated build.") }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun UpdateAvailableDialog(
@@ -176,10 +194,12 @@ fun UpdateAvailableDialog(
     onInstallClick: () -> Unit,
     onGrantPermissionClick: () -> Unit,
     onSkipVersion: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenReleasePage: () -> Unit = {}
 ) {
     val planner = ScheduleTheme.colors
     val hasApk = release.asset != null
+    val changelogItems = remember(release.body) { formatChangelogItems(release.body) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -215,7 +235,7 @@ fun UpdateAvailableDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Update v$latestVersion Available",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif),
                             color = planner.inkPrimary
                         )
                         Text(
@@ -245,17 +265,42 @@ fun UpdateAvailableDialog(
                     modifier = Modifier.padding(vertical = 12.dp)
                 )
 
-                Box(
+                Text(
+                    text = "WHAT'S NEW",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 1.0.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = planner.sagePrimary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 200.dp)
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = release.body.ifBlank { "Bug fixes, improvements, and updated build." },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = planner.inkPrimary
-                    )
+                    changelogItems.forEach { line ->
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                color = planner.sagePrimary,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .size(6.dp)
+                            ) {}
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = planner.inkPrimary
+                            )
+                        }
+                    }
                 }
 
                 if (!hasApk) {
@@ -267,7 +312,7 @@ fun UpdateAvailableDialog(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "This release has no APK file attached yet. Your current schedule remains unchanged.",
+                            text = "This release has no APK file attached yet. Open the GitHub release page or check back later.",
                             style = MaterialTheme.typography.bodySmall,
                             color = planner.onTerracottaContainer,
                             modifier = Modifier.padding(10.dp)
@@ -303,19 +348,19 @@ fun UpdateAvailableDialog(
 
                 ClayPrimaryButton(
                     onClick = {
-                        if (needsInstallPermission) {
-                            onGrantPermissionClick()
-                        } else {
-                            onInstallClick()
+                        when {
+                            !hasApk -> onOpenReleasePage()
+                            needsInstallPermission -> onGrantPermissionClick()
+                            else -> onInstallClick()
                         }
                     },
-                    enabled = hasApk,
+                    enabled = hasApk || release.htmlUrl.isNotBlank(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("update_now_button")
                 ) {
                     Text(
-                        text = if (hasApk) "Update now" else "No APK Attached",
+                        text = if (hasApk) "Update now" else "Open on GitHub",
                         style = MaterialTheme.typography.labelLarge
                     )
                 }
@@ -327,12 +372,23 @@ fun UpdateAvailableDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (hasApk && release.htmlUrl.isNotBlank()) {
+                        PaperOutlinedButton(
+                            onClick = onOpenReleasePage,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.testTag("open_release_page_button")
+                        ) {
+                            Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("GitHub", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                     PaperOutlinedButton(
                         onClick = onSkipVersion,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                         modifier = Modifier.testTag("skip_version_button")
                     ) {
-                        Text("Skip this version", style = MaterialTheme.typography.labelLarge)
+                        Text("Don't show again", style = MaterialTheme.typography.labelLarge)
                     }
                     PaperOutlinedButton(
                         onClick = onDismiss,
@@ -345,6 +401,181 @@ fun UpdateAvailableDialog(
             }
         }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun WhatsNewDialog(
+    versionName: String,
+    notes: List<String>,
+    onDontShowAgain: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val planner = ScheduleTheme.colors
+    val items = remember(notes) {
+        notes.ifEmpty { listOf("Updated build with layout improvements and stability fixes.") }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("whats_new_dialog"),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = planner.paperSheet),
+            border = BorderStroke(1.dp, planner.ruleStrong)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SkedLogoMark(size = 40.dp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "WHAT'S NEW",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                letterSpacing = 1.1.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = planner.sagePrimary
+                        )
+                        Text(
+                            text = "Sked v$versionName",
+                            style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif),
+                            color = planner.inkPrimary
+                        )
+                    }
+                    Surface(
+                        color = planner.sageContainer,
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.NewReleases,
+                            contentDescription = null,
+                            tint = planner.sageOnContainer,
+                            modifier = Modifier
+                                .padding(7.dp)
+                                .size(18.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    color = planner.ruleFine,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items.forEach { note ->
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                color = planner.terracotta,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .size(6.dp)
+                            ) {}
+                            Text(
+                                text = note,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = planner.inkPrimary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PaperOutlinedButton(
+                        onClick = onDontShowAgain,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        modifier = Modifier.testTag("whats_new_dont_show_again_button")
+                    ) {
+                        Text("Don't show again", style = MaterialTheme.typography.labelLarge)
+                    }
+                    ClayPrimaryButton(
+                        onClick = onDismiss,
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                        modifier = Modifier.testTag("whats_new_close_button")
+                    ) {
+                        Text("Got it", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UpdateErrorDialog(
+    message: String,
+    hasReleaseUrl: Boolean,
+    onOpenReleasePage: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val planner = ScheduleTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = planner.paperSheet,
+        modifier = Modifier.testTag("update_error_dialog"),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = planner.terracotta)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Update Could Not Complete", color = planner.inkPrimary)
+            }
+        },
+        text = {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = planner.inkPrimary
+            )
+        },
+        confirmButton = {
+            if (hasReleaseUrl) {
+                ClayPrimaryButton(
+                    onClick = onOpenReleasePage,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Open Releases", style = MaterialTheme.typography.labelLarge)
+                }
+            } else {
+                ClayPrimaryButton(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        },
+        dismissButton = {
+            if (hasReleaseUrl) {
+                PaperOutlinedButton(onClick = onDismiss) {
+                    Text("Close")
+                }
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 @Composable

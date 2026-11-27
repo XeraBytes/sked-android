@@ -14,11 +14,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import com.example.ui.dialogs.SettingsDialog
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.database.ScheduleDatabase
 import com.example.data.model.ClassBlock
 import com.example.data.model.ScheduleSettings
+import com.example.ui.components.SkedLaunchIntro
 import com.example.ui.components.UpdateAvailableDialog
+import com.example.ui.components.WhatsNewDialog
 import com.example.ui.screens.ClassPoolView
+import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MainScheduleContainer
 import com.example.ui.screens.ScreenshotReferenceView
 import com.example.ui.theme.ScheduleMakerTheme
@@ -26,6 +31,8 @@ import com.example.ui.viewmodel.ScheduleViewModel
 import com.example.updater.ReleaseAsset
 import com.example.updater.ReleaseInfo
 import com.github.takahirom.roborazzi.captureRoboImage
+import kotlinx.coroutines.cancel
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -167,6 +174,7 @@ class UiAfterCaptureTest {
         composeTestRule.onNodeWithContentDescription("Settings index").performClick()
         composeTestRule.onNodeWithText("Updates").performClick()
         composeTestRule.onNodeWithTag("check_updates_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("settings_whats_new_button").assertIsDisplayed()
     }
 
     @Test
@@ -336,5 +344,96 @@ class UiAfterCaptureTest {
             }
         }
         composeTestRule.onRoot().captureRoboImage("src/test/screenshots/after/updater_light.png")
+    }
+
+    @Test
+    fun captureAfter_whats_new_light() {
+        composeTestRule.setContent {
+            ScheduleMakerTheme(darkTheme = false) {
+                WhatsNewDialog(
+                    versionName = "1.1.0",
+                    notes = listOf(
+                        "Home tab with Next Class spotlight and quick shortcuts",
+                        "Animated Sked folio launch intro",
+                        "CCC e-GURO parser & editorial Settings updates"
+                    ),
+                    onDontShowAgain = {},
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("whats_new_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("whats_new_dont_show_again_button").assertIsDisplayed()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/after/whats_new_light.png")
+    }
+
+    @Test
+    fun captureAfter_home_light() {
+        composeTestRule.setContent {
+            ScheduleMakerTheme(darkTheme = false) {
+                HomeScreen(
+                    classes = sampleClasses,
+                    settings = sampleSettings,
+                    onOpenScheduleGrid = {},
+                    onOpenDailyAgenda = {},
+                    onOpenEguroSync = {},
+                    onOpenImport = {},
+                    onOpenPool = {},
+                    onAutoArrangePool = {},
+                    onAddClassClick = {},
+                    onClassClick = {},
+                    onReplayIntro = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("home_hero_card").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_open_weekly_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("home_open_eguro_button").assertIsDisplayed()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/after/home_light.png")
+    }
+
+    @Test
+    fun captureAfter_intro_light() {
+        var dismissed = false
+        composeTestRule.mainClock.autoAdvance = false
+        composeTestRule.setContent {
+            ScheduleMakerTheme(darkTheme = false) {
+                SkedLaunchIntro(onFinished = { dismissed = true })
+            }
+        }
+        composeTestRule.mainClock.advanceTimeBy(750)
+        composeTestRule.onNodeWithTag("sked_launch_intro").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Sked").assertIsDisplayed()
+        composeTestRule.onNodeWithText("ACADEMIC TIMETABLE STUDIO").assertIsDisplayed()
+        composeTestRule.onRoot().captureRoboImage("src/test/screenshots/after/intro_light.png")
+        composeTestRule.mainClock.autoAdvance = true
+        composeTestRule.onNodeWithTag("sked_launch_intro").performClick()
+        composeTestRule.runOnIdle { assertTrue(dismissed) }
+    }
+
+    @Test
+    fun homeAndIntro_navigatesToWeeklyGridAndReplaysIntro() {
+        ScheduleDatabase.resetForTest()
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = ScheduleViewModel(app)
+        try {
+            composeTestRule.setContent {
+                ScheduleMakerTheme {
+                    ScheduleApp(showLaunchIntro = false, initialTab = SkedTab.Home, viewModel = vm)
+                }
+            }
+            composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("home_open_weekly_button").performClick()
+            composeTestRule.onNodeWithTag("weekly_grid_view").assertIsDisplayed()
+
+            composeTestRule.onNodeWithTag("nav_tab_home").performClick()
+            composeTestRule.onNodeWithTag("home_logo_replay_button").performClick()
+            composeTestRule.onNodeWithTag("sked_launch_intro").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("sked_launch_intro").performClick()
+            composeTestRule.onNodeWithTag("home_screen").assertIsDisplayed()
+        } finally {
+            vm.viewModelScope.cancel()
+            ScheduleDatabase.resetForTest()
+        }
     }
 }
